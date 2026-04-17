@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Guitar Drummer</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: #1a1a2e;
+    color: #eee;
+    font-family: 'Segoe UI', sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 100vh;
+    padding: 30px 20px;
+  }
+
+  h1 {
+    font-size: 2rem;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: #e94560;
+    margin-bottom: 6px;
+  }
+
+  .subtitle {
+    font-size: 0.85rem;
+    color: #888;
+    letter-spacing: 2px;
+    margin-bottom: 30px;
+  }
+
+  /* Style selector */
+  .styles {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    justify-content: center;
+    margin-bottom: 30px;
+    max-width: 700px;
+  }
+
+  .style-btn {
+    padding: 10px 20px;
+    border: 2px solid #333;
+    background: #16213e;
+    color: #aaa;
+    border-radius: 25px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    letter-spacing: 1px;
+    transition: all 0.2s;
+    text-transform: uppercase;
+  }
+
+  .style-btn:hover { border-color: #e94560; color: #eee; }
+  .style-btn.active {
+    background: #e94560;
+    border-color: #e94560;
+    color: #fff;
+    box-shadow: 0 0 15px rgba(233,69,96,0.4);
+  }
+
+  /* BPM Control */
+  .bpm-section {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 30px;
+    width: 100%;
+    max-width: 400px;
+  }
+
+  .bpm-display {
+    font-size: 3rem;
+    font-weight: bold;
+    color: #e94560;
+    line-height: 1;
+  }
+
+  .bpm-label { font-size: 0.75rem; color: #666; letter-spacing: 2px; }
+
+  .bpm-controls {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    width: 100%;
+  }
+
+  .bpm-slider {
+    flex: 1;
+    -webkit-appearance: none;
+    height: 4px;
+    border-radius: 2px;
+    background: #333;
+    outline: none;
+  }
+
+  .bpm-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #e94560;
+    cursor: pointer;
+    box-shadow: 0 0 8px rgba(233,69,96,0.5);
+  }
+
+  .bpm-btn {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border: 2px solid #444;
+    background: #16213e;
+    color: #eee;
+    font-size: 1.2rem;
+    cursor: pointer;
+    transition: all 0.15s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .bpm-btn:hover { border-color: #e94560; color: #e94560; }
+
+  /* Beat visualizer */
+  .visualizer {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 30px;
+    flex-wrap: wrap;
+    justify-content: center;
+    max-width: 700px;
+  }
+
+  .beat-group {
+    display: flex;
+    gap: 4px;
+  }
+
+  .step {
+    width: 36px;
+    height: 36px;
+    border-radius: 6px;
+    background: #16213e;
+    border: 1px solid #2a2a4a;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-around;
+    padding: 3px;
+    transition: border-color 0.1s;
+  }
+
+  .step.current { border-color: #e94560; box-shadow: 0 0 10px rgba(233,69,96,0.3); }
+
+  .step-dot {
+    width: 100%;
+    height: 6px;
+    border-radius: 3px;
+    background: #2a2a4a;
+    transition: background 0.05s;
+  }
+
+  .step-dot.kick.on   { background: #e94560; }
+  .step-dot.snare.on  { background: #f5a623; }
+  .step-dot.hihat.on  { background: #7ed6df; }
+  .step-dot.ride.on   { background: #a29bfe; }
+
+  /* Play/Stop */
+  .controls {
+    display: flex;
+    gap: 20px;
+    align-items: center;
+    margin-bottom: 30px;
+  }
+
+  .play-btn {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    border: none;
+    background: #e94560;
+    color: white;
+    font-size: 2rem;
+    cursor: pointer;
+    box-shadow: 0 0 25px rgba(233,69,96,0.4);
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .play-btn:hover { transform: scale(1.08); box-shadow: 0 0 35px rgba(233,69,96,0.6); }
+  .play-btn:active { transform: scale(0.95); }
+
+  /* Legend */
+  .legend {
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+    justify-content: center;
+    font-size: 0.75rem;
+    color: #666;
+    letter-spacing: 1px;
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .legend-dot {
+    width: 12px;
+    height: 6px;
+    border-radius: 3px;
+  }
+
+  /* Style info */
+  .style-info {
+    text-align: center;
+    color: #666;
+    font-size: 0.8rem;
+    letter-spacing: 1px;
+    margin-bottom: 15px;
+    min-height: 18px;
+  }
+</style>
+</head>
+<body>
+
+<h1>Guitar Drummer</h1>
+<p class="subtitle">Rhythm Machine</p>
+
+<div class="styles" id="styles"></div>
+
+<div class="style-info" id="styleInfo"></div>
+
+<div class="bpm-section">
+  <div class="bpm-display" id="bpmDisplay">90</div>
+  <div class="bpm-label">BPM</div>
+  <div class="bpm-controls">
+    <button class="bpm-btn" onclick="changeBpm(-5)">−</button>
+    <input type="range" class="bpm-slider" id="bpmSlider" min="40" max="220" value="90" oninput="setBpm(this.value)">
+    <button class="bpm-btn" onclick="changeBpm(5)">+</button>
+  </div>
+</div>
+
+<div class="controls">
+  <button class="play-btn" id="playBtn" onclick="togglePlay()">&#9654;</button>
+</div>
+
+<div class="visualizer" id="visualizer"></div>
+
+<div class="legend">
+  <div class="legend-item"><div class="legend-dot" style="background:#e94560"></div>KICK</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#f5a623"></div>SNARE</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#7ed6df"></div>HI-HAT</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#a29bfe"></div>RIDE</div>
+</div>
+
+<script>
+// ─── Beat Styles ──────────────────────────────────────────────────────────────
+// Each pattern = 16 steps: [kick, snare, hihat, ride]
+const STYLES = {
+  "Rock": {
+    bpm: 120,
+    info: "Classic 4/4 rock beat — backbeat on 2 & 4",
+    patterns: {
+      kick:  [1,0,0,0, 1,0,0,0, 1,0,0,0, 1,0,0,0],
+      snare: [0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,0],
+      hihat: [1,0,1,0, 1,0,1,0, 1,0,1,0, 1,0,1,0],
+      ride:  [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+    }
+  },
+  "Shuffle": {
+    bpm: 90,
+    info: "Swinging shuffle feel — great for blues & rock",
+    patterns: {
+      kick:  [1,0,0,0, 0,0,1,0, 0,0,0,0, 0,0,1,0],
+      snare: [0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,0],
+      hihat: [1,0,1,0, 0,0,1,0, 1,0,1,0, 0,0,1,0],
+      ride:  [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+    }
+  },
+  "Blues": {
+    bpm: 75,
+    info: "Slow 12-bar blues groove",
+    patterns: {
+      kick:  [1,0,0,1, 0,0,1,0, 1,0,0,0, 0,0,1,0],
+      snare: [0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,1],
+      hihat: [1,0,1,0, 1,0,1,0, 1,0,1,0, 1,0,1,0],
+      ride:  [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+    }
+  },
+  "Jazz": {
+    bpm: 140,
+    info: "Ride-driven jazz swing",
+    patterns: {
+      kick:  [1,0,0,0, 0,0,0,0, 1,0,0,0, 0,0,0,0],
+      snare: [0,0,0,0, 0,0,1,0, 0,0,0,0, 0,0,1,0],
+      hihat: [0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,0],
+      ride:  [1,0,1,1, 1,0,1,1, 1,0,1,1, 1,0,1,1],
+    }
+  },
+  "Funk": {
+    bpm: 100,
+    info: "Syncopated funk with ghost notes",
+    patterns: {
+      kick:  [1,0,0,1, 0,0,1,0, 0,1,0,0, 1,0,0,0],
+      snare: [0,0,0,0, 1,0,0,1, 0,0,0,0, 1,0,0,0],
+      hihat: [1,1,1,1, 1,1,1,1, 1,1,1,1, 1,1,1,1],
+      ride:  [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+    }
+  },
+  "Country": {
+    bpm: 110,
+    info: "Two-step country feel",
+    patterns: {
+      kick:  [1,0,0,0, 0,0,0,0, 1,0,0,0, 0,0,1,0],
+      snare: [0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,0],
+      hihat: [1,0,1,0, 1,0,1,0, 1,0,1,0, 1,0,1,0],
+      ride:  [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+    }
+  },
+  "Metal": {
+    bpm: 160,
+    info: "Double kick metal blast",
+    patterns: {
+      kick:  [1,0,1,0, 1,0,1,0, 1,0,1,0, 1,0,1,0],
+      snare: [0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,0],
+      hihat: [1,1,1,1, 1,1,1,1, 1,1,1,1, 1,1,1,1],
+      ride:  [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+    }
+  },
+  "Reggae": {
+    bpm: 80,
+    info: "Offbeat one-drop reggae feel",
+    patterns: {
+      kick:  [0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,0],
+      snare: [0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,0],
+      hihat: [0,1,0,1, 0,1,0,1, 0,1,0,1, 0,1,0,1],
+      ride:  [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+    }
+  },
+  "Bossa Nova": {
+    bpm: 120,
+    info: "Classic Brazilian bossa nova clave",
+    patterns: {
+      kick:  [1,0,0,1, 0,0,1,0, 0,1,0,0, 1,0,0,0],
+      snare: [0,0,1,0, 0,1,0,0, 0,0,1,0, 0,1,0,0],
+      hihat: [1,0,1,0, 1,0,1,0, 1,0,1,0, 1,0,1,0],
+      ride:  [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+    }
+  },
+  "Half-Time": {
+    bpm: 80,
+    info: "Slow half-time feel — big snare on beat 3",
+    patterns: {
+      kick:  [1,0,0,0, 1,0,0,0, 0,0,0,0, 0,0,1,0],
+      snare: [0,0,0,0, 0,0,0,0, 1,0,0,0, 0,0,0,0],
+      hihat: [1,0,1,0, 1,0,1,0, 1,0,1,0, 1,0,1,0],
+      ride:  [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+    }
+  },
+};
+
+// ─── Audio Engine ─────────────────────────────────────────────────────────────
+let ctx = null;
+
+function getCtx() {
+  if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
+  if (ctx.state === 'suspended') ctx.resume();
+  return ctx;
+}
+
+function playKick(time) {
+  const c = getCtx();
+  const osc = c.createOscillator();
+  const gain = c.createGain();
+  osc.connect(gain); gain.connect(c.destination);
+  osc.frequency.setValueAtTime(150, time);
+  osc.frequency.exponentialRampToValueAtTime(0.01, time + 0.5);
+  gain.gain.setValueAtTime(1.0, time);
+  gain.gain.exponentialRampToValueAtTime(0.001, time + 0.5);
+  osc.start(time); osc.stop(time + 0.5);
+}
+
+function playSnare(time) {
+  const c = getCtx();
+  // Noise
+  const bufSize = c.sampleRate * 0.2;
+  const buf = c.createBuffer(1, bufSize, c.sampleRate);
+  const data = buf.getChannelData(0);
+  for (let i = 0; i < bufSize; i++) data[i] = Math.random() * 2 - 1;
+  const src = c.createBufferSource();
+  src.buffer = buf;
+  const noiseGain = c.createGain();
+  const filter = c.createBiquadFilter();
+  filter.type = 'highpass';
+  filter.frequency.value = 1000;
+  src.connect(filter); filter.connect(noiseGain); noiseGain.connect(c.destination);
+  noiseGain.gain.setValueAtTime(0.8, time);
+  noiseGain.gain.exponentialRampToValueAtTime(0.001, time + 0.2);
+  // Tone
+  const osc = c.createOscillator();
+  const oscGain = c.createGain();
+  osc.connect(oscGain); oscGain.connect(c.destination);
+  osc.frequency.value = 180;
+  oscGain.gain.setValueAtTime(0.5, time);
+  oscGain.gain.exponentialRampToValueAtTime(0.001, time + 0.1);
+  src.start(time); src.stop(time + 0.2);
+  osc.start(time); osc.stop(time + 0.1);
+}
+
+function playHihat(time, open = false) {
+  const c = getCtx();
+  const bufSize = c.sampleRate * (open ? 0.3 : 0.05);
+  const buf = c.createBuffer(1, bufSize, c.sampleRate);
+  const data = buf.getChannelData(0);
+  for (let i = 0; i < bufSize; i++) data[i] = Math.random() * 2 - 1;
+  const src = c.createBufferSource();
+  src.buffer = buf;
+  const filter = c.createBiquadFilter();
+  filter.type = 'highpass';
+  filter.frequency.value = 7000;
+  const gain = c.createGain();
+  src.connect(filter); filter.connect(gain); gain.connect(c.destination);
+  gain.gain.setValueAtTime(0.5, time);
+  gain.gain.exponentialRampToValueAtTime(0.001, time + (open ? 0.3 : 0.05));
+  src.start(time); src.stop(time + (open ? 0.3 : 0.05));
+}
+
+function playRide(time) {
+  const c = getCtx();
+  const bufSize = c.sampleRate * 0.4;
+  const buf = c.createBuffer(1, bufSize, c.sampleRate);
+  const data = buf.getChannelData(0);
+  for (let i = 0; i < bufSize; i++) data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (c.sampleRate * 0.1));
+  const src = c.createBufferSource();
+  src.buffer = buf;
+  const filter = c.createBiquadFilter();
+  filter.type = 'bandpass';
+  filter.frequency.value = 5000;
+  filter.Q.value = 0.5;
+  const gain = c.createGain();
+  src.connect(filter); filter.connect(gain); gain.connect(c.destination);
+  gain.gain.setValueAtTime(0.6, time);
+  gain.gain.exponentialRampToValueAtTime(0.001, time + 0.4);
+  src.start(time); src.stop(time + 0.4);
+}
+
+// ─── Sequencer ────────────────────────────────────────────────────────────────
+let bpm = 90;
+let currentStyle = 'Rock';
+let playing = false;
+let currentStep = -1;
+let nextNoteTime = 0;
+let schedulerTimer = null;
+let lookahead = 25.0;       // ms
+let scheduleAhead = 0.1;    // seconds
+
+function scheduleNote(step, time) {
+  const pat = STYLES[currentStyle].patterns;
+  if (pat.kick[step])  playKick(time);
+  if (pat.snare[step]) playSnare(time);
+  if (pat.hihat[step]) playHihat(time);
+  if (pat.ride[step])  playRide(time);
+}
+
+function scheduler() {
+  const c = getCtx();
+  while (nextNoteTime < c.currentTime + scheduleAhead) {
+    const step = (currentStep + 1) % 16;
+    scheduleNote(step, nextNoteTime);
+    // Update visual on next animation frame
+    const capturedStep = step;
+    const capturedTime = nextNoteTime;
+    setTimeout(() => {
+      if (playing) updateVisualStep(capturedStep);
+    }, Math.max(0, (capturedTime - c.currentTime) * 1000 - 10));
+    currentStep = step;
+    nextNoteTime += (60 / bpm) / 4; // 16th notes
+  }
+}
+
+function startPlayback() {
+  getCtx();
+  playing = true;
+  currentStep = -1;
+  nextNoteTime = getCtx().currentTime + 0.05;
+  schedulerTimer = setInterval(scheduler, lookahead);
+  document.getElementById('playBtn').innerHTML = '&#9646;&#9646;';
+}
+
+function stopPlayback() {
+  playing = false;
+  clearInterval(schedulerTimer);
+  schedulerTimer = null;
+  updateVisualStep(-1);
+  document.getElementById('playBtn').innerHTML = '&#9654;';
+}
+
+function togglePlay() {
+  if (playing) stopPlayback(); else startPlayback();
+}
+
+// ─── Visuals ──────────────────────────────────────────────────────────────────
+function buildVisualizer() {
+  const vis = document.getElementById('visualizer');
+  vis.innerHTML = '';
+  const pat = STYLES[currentStyle].patterns;
+  for (let i = 0; i < 16; i++) {
+    if (i % 4 === 0 && i > 0) {
+      const sep = document.createElement('div');
+      sep.style.width = '4px';
+      vis.appendChild(sep);
+    }
+    const step = document.createElement('div');
+    step.className = 'step';
+    step.id = `step-${i}`;
+    ['kick','snare','hihat','ride'].forEach(t => {
+      const dot = document.createElement('div');
+      dot.className = `step-dot ${t}${pat[t][i] ? ' on' : ''}`;
+      step.appendChild(dot);
+    });
+    vis.appendChild(step);
+  }
+}
+
+function updateVisualStep(step) {
+  for (let i = 0; i < 16; i++) {
+    const el = document.getElementById(`step-${i}`);
+    if (!el) continue;
+    if (i === step) el.classList.add('current');
+    else el.classList.remove('current');
+  }
+}
+
+// ─── Controls ─────────────────────────────────────────────────────────────────
+function setBpm(val) {
+  bpm = parseInt(val, 10);
+  document.getElementById('bpmDisplay').textContent = bpm;
+  document.getElementById('bpmSlider').value = bpm;
+}
+
+function changeBpm(delta) {
+  setBpm(Math.min(220, Math.max(40, bpm + delta)));
+}
+
+function selectStyle(name) {
+  currentStyle = name;
+  bpm = STYLES[name].bpm;
+  document.getElementById('bpmDisplay').textContent = bpm;
+  document.getElementById('bpmSlider').value = bpm;
+  document.getElementById('styleInfo').textContent = STYLES[name].info;
+  document.querySelectorAll('.style-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.style === name);
+  });
+  buildVisualizer();
+  if (playing) {
+    stopPlayback();
+    startPlayback();
+  }
+}
+
+// ─── Init ─────────────────────────────────────────────────────────────────────
+function init() {
+  const stylesEl = document.getElementById('styles');
+  Object.keys(STYLES).forEach(name => {
+    const btn = document.createElement('button');
+    btn.className = 'style-btn';
+    btn.dataset.style = name;
+    btn.textContent = name;
+    btn.onclick = () => selectStyle(name);
+    stylesEl.appendChild(btn);
+  });
+  selectStyle('Rock');
+}
+
+init();
+</script>
+</body>
+</html>
