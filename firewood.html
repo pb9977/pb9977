@@ -38,14 +38,14 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 
 // ---------------------------------------------------------------- constants (1 unit = 1 metre)
 const SIZE = 640;
-const L = 60;                 // loop length (s)
+const L = 72;                 // loop length (s)
 const BUILD_END = 1, LIVE_END = L - 1;
 const POP = 0.35;
 const MAX_DELAY = BUILD_END - POP;
 
-const NLOG = 30, SEGS = 3, QUARTERS = 4;
-const NPIECE = NLOG * SEGS * QUARTERS;          // 360 split pieces
-const T0 = 1, PC = 54 / NLOG;                    // first pick-up, seconds per log
+const NLOG = 30, SEGS = 3, HALVES = 2;
+const NPIECE = NLOG * SEGS * HALVES;            // 180 split pieces (each chop splits a third in two)
+const T0 = 1, PC = 2.3;                          // first pick-up, seconds per log
 const LOG_D = 0.16;
 const SOLID = Math.PI * (LOG_D / 2) ** 2 * 1;    // m³ per 1 m log
 const STACKED_M3 = NLOG * SOLID * 1.5;           // 1 m logs, stacked  (≈ 1.5 × solid)
@@ -216,17 +216,15 @@ function updateKinds(t) {
 }
 
 // ---------------------------------------------------------------- layout
-const SCX = -0.3, SCZ = 1.4, HALF = 5.3;         // slab centre & half-size
-const TRACTOR = { x: -1.05, z: -0.5 };            // rear axle on the ground, tractor faces -x
-const MACH_X = 0.5;                               // splitter centreline (log travels +z)
-const TROUGH = { y: 0.83, z: -1.65 };             // log centre when lying in the infeed
-const SAW_Z = -0.55;
-const CONV_S = new THREE.Vector3(MACH_X, 0.66, 0.45), CONV_E = new THREE.Vector3(MACH_X, 2.3, 3.1);
-const CONV_LEN = CONV_S.distanceTo(CONV_E), CONV_A = Math.atan2(CONV_E.y - CONV_S.y, CONV_E.z - CONV_S.z);
-const CONV_T = 1.5;                               // seconds bottom→top (40 per loop)
-const PILE = { x: 0.5, z: 4.0, R: 1.15 };
+const SCX = -0.4, SCZ = -0.4, HALF = 4.6;         // slab centre & half-size
+const TRACTOR = { x: -1.55, z: -0.5 };            // rear axle on the ground, tractor faces -x
+const MACH_X = 0.5;                               // feed trough centreline (log is pushed +z)
+const SAW_Z = -0.55;                              // cut plane swept by the flywheel blade
+const TROUGH = { y: 0.83, z: SAW_Z - 0.5 };       // log centre when laid in the trough
+const PILE = { x: 1.95, z: 0.85, R: 1.15 };
 PILE.H = 3 * LOOSE_M3 / (Math.PI * PILE.R ** 2);  // cone holding the loose volume
-const WORK = { xA: 1.6, xB: 1.0, z: TROUGH.z };   // worker: at stack / at infeed
+// worker spots: A at the log stack, P beside the trough, B behind the log (pushing from there)
+const WORK = { xA: 1.6, zA: -1.65, xP: 1.05, zP: -1.05, xB: MACH_X, zB: SAW_Z - 1 - 0.42 };
 const EXHAUST = new THREE.Vector3(TRACTOR.x - 1.55, 2.12, TRACTOR.z - 0.2);
 
 // ---------------------------------------------------------------- slab (always present)
@@ -304,81 +302,52 @@ const pto = new Kind([
   { geo: RB(0.08, 0.13, 0.13, 0.03), color: C.orange, local: (p, o) => TRS(-0.27, 0, 0, p.spin, 0, 0, 1, 1, 1, o) },
   { geo: RB(0.08, 0.13, 0.13, 0.03), color: C.orange, local: (p, o) => TRS(0.27, 0, 0, p.spin, 0, 0, 1, 1, 1, o) },
 ], 1);
-pto.add(0.3, (t) => ({ x: -0.2, y: 0.6, z: TRACTOR.z, spin: TAU * 300 * t / L }));
+pto.add(0.3, (t) => ({ x: -0.7, y: 0.6, z: TRACTOR.z, spin: TAU * 300 * t / L }));
 pto.finalize();
 
-// ---------------------------------------------------------------- Nokka-style firewood processor (saw + 4-way splitter + conveyor)
+// ---------------------------------------------------------------- old-style flywheel chopper: hand-fed, one stroke cuts and splits
 {
   const g = new THREE.Group();
   for (const sx of [-1, 1]) {
-    for (const z of [-2.05, 0.35]) g.add(mesh(RB(0.1, 0.6, 0.1, 0.03), C.blue, sx * 0.28, 0.3, z));
-    g.add(mesh(RB(0.08, 0.1, 2.55, 0.03), C.blue, sx * 0.28, 0.62, -0.85));
-    g.add(mesh(RB(0.24, 0.035, 1.5, 0.015), C.teal, sx * 0.11, 0.77, -1.45, 0, 0, sx * 0.55));   // infeed V-trough
-    g.add(mesh(RB(0.65, 0.06, 0.06, 0.02), C.steel, -0.675, 0.48, TRACTOR.z + sx * 0.32)); // lower links
+    for (const z of [-1.65, -0.25]) g.add(mesh(RB(0.1, 0.6, 0.1, 0.03), C.blue, sx * 0.24, 0.3, z));
+    g.add(mesh(RB(0.08, 0.1, 1.55, 0.03), C.blue, sx * 0.24, 0.62, -0.95));
+    g.add(mesh(RB(0.24, 0.035, 1.1, 0.015), C.teal, sx * 0.11, 0.77, SAW_Z - 0.55, 0, 0, sx * 0.55));  // hand-feed V-trough
+    g.add(mesh(RB(0.65, 0.06, 0.06, 0.02), C.steel, -1.175, 0.48, TRACTOR.z + sx * 0.32));             // lower links
   }
-  g.add(mesh(RB(0.6, 0.06, 0.06, 0.02), C.steel, -0.65, 1.0, TRACTOR.z));                         // top link
-  g.add(mesh(RB(0.62, 0.5, 0.95, 0.07), C.blue, 0, 0.85, -0.05));                                 // splitter body
-  g.add(mesh(RB(0.26, 0.26, 0.03, 0.04), C.navy, 0, 0.84, -0.53));                                // infeed mouth
-  g.add(octo(0.8, 0.13, C.teal, 0, 1.32, -0.6));                                                  // saw guard
-  g.add(mesh(RB(0.25, 0.25, 0.25, 0.05), C.blueDeep, -0.42, 0.62, TRACTOR.z));                    // gearbox
-  g.add(mesh(RB(0.4, 0.34, 0.5, 0.07), C.teal, -0.05, 1.27, 0.12));                               // hydraulic tank
-  g.add(mesh(RB(0.14, 0.14, 0.85, 0.05), C.offWhite, -0.38, 0.7, -1.2));                          // splitter cylinder
-  g.add(mesh(RB(0.04, 0.04, 0.9, 0.015), C.navy, -0.33, 0.8, -0.8, 0.2, 0, 0));                  // hose
-  for (const [z, a] of [[-1.0, 0.2], [-0.86, -0.15]]) {
-    g.add(mesh(RB(0.03, 0.36, 0.03, 0.012), C.navy, 0.35, 1.2, z, a, 0, 0));
-    g.add(mesh(RB(0.07, 0.07, 0.07, 0.03), C.orange, 0.35, 1.38, z + 0.035 * Math.sign(a)));
+  g.add(mesh(RB(0.6, 0.06, 0.06, 0.02), C.steel, -1.15, 1.0, TRACTOR.z));                               // top link
+  g.add(mesh(RB(0.34, 0.42, 0.28, 0.06), C.blueDeep, -0.7, 0.68, SAW_Z - 0.26));                        // flywheel bearing / angle gearbox
+  g.add(mesh(RB(0.06, 0.06, 0.5, 0.02), C.blue, -0.32, 0.62, SAW_Z - 0.2));
+  // guard arching over the top of the flywheel
+  for (let i = -2; i <= 2; i++) {
+    const a = Math.PI / 2 + i * 0.36;
+    g.add(mesh(RB(0.24, 0.05, 0.22, 0.02), C.teal, -0.7 + 0.66 * Math.cos(a), TROUGH.y + 0.66 * Math.sin(a), SAW_Z - 0.09, 0, 0, a - Math.PI / 2));
   }
-  g.add(mesh(RB(0.3, 0.035, 0.035, 0.012), C.offWhite, 0, 0.8, 0.44, 0, 0, Math.PI / 4));        // 4-way wedge
-  g.add(mesh(RB(0.3, 0.035, 0.035, 0.012), C.offWhite, 0, 0.8, 0.44, 0, 0, -Math.PI / 4));
-  // conveyor
-  const mid = CONV_S.clone().add(CONV_E).multiplyScalar(0.5);
-  g.add(mesh(RB(0.36, 0.04, CONV_LEN + 0.2, 0.015), C.navy, 0, mid.y, mid.z, -CONV_A));
-  for (const sx of [-1, 1]) g.add(mesh(RB(0.05, 0.14, CONV_LEN + 0.25, 0.02), C.blue, sx * 0.21, mid.y + 0.04, mid.z, -CONV_A));
-  for (const z of [1.9, 2.85]) {
-    const y = CONV_S.y + (z - CONV_S.z) * Math.tan(CONV_A);
-    for (const sx of [-1, 1]) g.add(mesh(RB(0.07, y, 0.07, 0.025), C.blue, sx * 0.2, y / 2, z));
-    g.add(mesh(RB(0.48, 0.06, 0.06, 0.02), C.blue, 0, y * 0.5, z));
-  }
-  g.add(octo(0.18, 0.4, C.steel, 0, CONV_E.y - 0.03, CONV_E.z, Math.PI / 2));                    // head drum
+  g.add(mesh(RB(0.3, 0.3, 0.03, 0.02), C.steel, 0, TROUGH.y, SAW_Z + 0.36));                            // length stop (1/3 m)
+  g.add(mesh(RB(0.04, 0.04, 0.4, 0.015), C.steel, 0.17, TROUGH.y, SAW_Z + 0.18));
+  g.add(mesh(RB(0.75, 0.03, 0.45, 0.012), C.steel, 0.42, 0.58, SAW_Z + 0.18, 0, 0, -0.45));             // side chute
   addGroup(g, 0.2, MACH_X, 0, 0);
-  fitPoints.push(CONV_E.clone().setY(2.6));
 }
-// spinning drive pulley on the saw guard, splitter ram, conveyor cleats
-const pulley = new Kind([0, 1, 2, 3].map((i) => ({ geo: RB(0.42, 0.174, 0.05, 0.02), color: C.offWhite, local: (p, o) => TRS(0, 0, 0, 0, 0, p.spin + i * Math.PI / 4, 1, 1, 1, o) }))
-  .concat([{ geo: RB(0.36, 0.05, 0.07, 0.02), color: C.navy, local: (p, o) => TRS(0, 0, 0.03, 0, 0, p.spin, 1, 1, 1, o) }]), 1);
-pulley.add(0.4, (t) => ({ x: MACH_X, y: 1.32, z: SAW_Z - 0.14, spin: -TAU * 200 * t / L }));
-pulley.finalize();
+// the flywheel with its chopping/splitting blade, spinning off the PTO (2 rev/s)
+const flywheel = new Kind([
+  ...[0, 1, 2, 3].map((i) => ({ geo: RB(1.1, 1.1 * 0.4142, 0.1, 0.04), color: C.navy, local: (p, o) => TRS(0, 0, 0, 0, 0, p.spin + i * Math.PI / 4, 1, 1, 1, o) })),
+  { geo: RB(0.2, 0.2, 0.16, 0.06), color: C.offWhite, local: (p, o) => TRS(0, 0, 0.02, 0, 0, p.spin, 1, 1, 1, o) },
+  { geo: RB(0.5, 0.12, 0.03, 0.012), color: C.steel, local: (p, o) => pivot(o, 0, 0, 0.065, 0, 0, p.spin, 0.62, 0, 0) },        // axe blade
+  { geo: RB(0.36, 0.03, 0.1, 0.012), color: C.orange, local: (p, o) => pivot(o, 0, 0, 0.1, 0, 0, p.spin, 0.68, 0.0, 0) },     // splitting wedge
+], 1);
+flywheel.add(0.4, (t) => ({ x: MACH_X - 0.7, y: TROUGH.y, z: SAW_Z - 0.07, spin: -TAU * 144 * t / L }));
+flywheel.finalize();
 
 // ---------------------------------------------------------------- schedule (pure functions of t)
+// Per log (seconds after pick-up): lift, carry, lay in trough, step behind it, then three pushes of 1/3 m.
+const PUSH0 = 0.95, PUSH_GAP = 0.4, PUSH_LEN = 0.2, FLY = 0.55;
 const pickT = (k) => T0 + k * PC;
-const placeT = (k) => pickT(k) + 0.97;
-const cutT = (k, j) => placeT(k) + 0.35 + 0.4 * j;
-const splitT = (k, j) => cutT(k, j) + 0.22;
-const bornT = (k, j) => splitT(k, j) + 0.15;
-const tipT = (k, j, q) => bornT(k, j) + CONV_T * (1 + q * 0.09);
-const FLY = 0.45;
-const landT = (k, j, q) => tipT(k, j, q) + FLY;
-const CUTS = [], SPLITS = [];
-for (let k = 0; k < NLOG; k++) for (let j = 0; j < SEGS; j++) { CUTS.push(cutT(k, j)); SPLITS.push(splitT(k, j)); }
+const placeT = (k) => pickT(k) + 0.72;
+const pushT = (k, j) => pickT(k) + PUSH0 + PUSH_GAP * j;
+const chopT = (k, j) => pushT(k, j) + PUSH_LEN;
+const CHOPS = [];
+for (let k = 0; k < NLOG; k++) for (let j = 0; j < SEGS; j++) CHOPS.push(chopT(k, j));
 const lastBefore = (arr, t) => { let r = -1e9; for (const x of arr) if (x <= t) r = x; else break; return r; };
-// Feed: the log advances through the saw one third at a time.
-const F0 = (SAW_Z + 1 / 3) - (TROUGH.z + 0.5);
-const feed = (tau) => F0 * smoothstep(0.05, 0.3, tau) + (1 / 3) * smoothstep(0.45, 0.7, tau) + (1 / 3) * smoothstep(0.85, 1.1, tau);
-const ramExt = (t) => { const a = t - lastBefore(SPLITS, t); return a < 0.15 ? smooth(a / 0.15) : 1 - smooth((a - 0.15) / 0.3); };
-
-const ram = new Kind([
-  { geo: RB(0.05, 0.05, 1, 0.02), color: C.steel, local: (p, o) => TRS(0, 0, p.len / 2, 0, 0, 0, 1, 1, p.len, o) },
-], 1);
-ram.add(0.4, (t) => ({ x: MACH_X - 0.38, y: 0.7, z: -0.78, len: 0.08 + 0.5 * ramExt(t) }));
-ram.finalize();
-const cleats = new Kind([{ geo: RB(0.34, 0.05, 0.04, 0.015), color: C.offWhite, local: new THREE.Matrix4() }], 12);
-for (let i = 0; i < 10; i++) {
-  cleats.add(0.45, (t) => {
-    const u = (i / 10 + t / CONV_T) % 1;
-    return { x: MACH_X, y: lerp(CONV_S.y, CONV_E.y, u) + 0.04, z: lerp(CONV_S.z, CONV_E.z, u), rx: -CONV_A, s: bump(0, 1, u) ** 0.3 };
-  });
-}
-cleats.finalize();
+const feed = (k, t) => { let f = 0; for (let j = 0; j < SEGS; j++) f += smoothstep(pushT(k, j), chopT(k, j), t) / 3; return f; };
 
 // ---------------------------------------------------------------- the worker (forestry gear)
 const HIP = 0.88;
@@ -406,25 +375,31 @@ const worker = new Kind([
   { geo: RB(0.07, 0.12, 0.12, 0.04), color: C.navy, local: fixed(TRS(0.15, 1.63, 0)) },
   { geo: RB(0.27, 0.09, 0.02, 0.01), color: C.steel, local: fixed(TRS(0, 1.78, 0.16, -0.5)) }, // mesh visor (raised)
 ], 1);
+const YAW_X = faceY(1, 0), YAW_NX = faceY(-1, 0), YAW_Z = faceY(0, 1);
+function walk(x0, z0, x1, z1, ry, u) {
+  return { x: lerp(x0, x1, smooth(u)), z: lerp(z0, z1, smooth(u)), ry, ph: smooth(u) * 2 * Math.hypot(x1 - x0, z1 - z0) / 0.35, amp: bump(0, 1, u), lean: 0.08 };
+}
 function workerPose(t) {
   const k = Math.floor((t - T0) / PC), tau = t - pickT(k);
-  const atA = { x: WORK.xA, z: WORK.z, ry: faceY(1, 0), ph: 0, amp: 0, lean: 0, arm: -0.1 };
+  const atA = { x: WORK.xA, z: WORK.zA, ry: YAW_X, ph: 0, amp: 0, lean: 0, arm: -0.1 };
   if (t < T0 || k >= NLOG) return { ...atA, arm: -0.1 + 0.05 * Math.sin(TAU * t / 4) };
-  const turn = (a, b, u) => lerp(a, b, smooth(u));
-  const carry = -1.25;
-  if (tau < 0.25) return { ...atA, lean: 0.75 * bump(0, 0.25, tau), arm: lerp(-0.6, carry, smooth(tau / 0.25)) };
-  if (tau < 0.37) return { ...atA, ry: turn(faceY(1, 0), faceY(1, 0) - Math.PI, (tau - 0.25) / 0.12), arm: carry };
-  if (tau < 0.82) {
-    const u = (tau - 0.37) / 0.45;
-    return { x: lerp(WORK.xA, WORK.xB, smooth(u)), z: WORK.z, ry: faceY(-1, 0), ph: smooth(u) * 6.3, amp: bump(0, 1, u), lean: 0.1, arm: carry };
+  const carry = -1.25, push = -1.45;
+  if (tau < 0.2) return { ...atA, lean: 0.75 * bump(0, 0.2, tau), arm: lerp(-0.6, carry, smooth(tau / 0.2)) };
+  if (tau < 0.3) return { ...atA, ry: lerp(YAW_X, YAW_X - Math.PI, smooth((tau - 0.2) / 0.1)), arm: carry };
+  if (tau < 0.6) return { ...walk(WORK.xA, WORK.zA, WORK.xP, WORK.zP, YAW_NX, (tau - 0.3) / 0.3), arm: carry };
+  if (tau < 0.72) return { x: WORK.xP, z: WORK.zP, ry: YAW_NX, ph: 0, amp: 0, lean: 0.5 * bump(0.6, 0.72, tau), arm: lerp(carry, -0.6, smooth((tau - 0.6) / 0.12)) };
+  if (tau < PUSH0) {
+    const u = (tau - 0.72) / (PUSH0 - 0.72);
+    return { ...walk(WORK.xP, WORK.zP, WORK.xB, WORK.zB, lerp(YAW_NX, YAW_Z, smooth(u * 1.5)), u), arm: lerp(-0.6, push + 0.3, smooth(u)) };
   }
-  if (tau < 0.97) return { x: WORK.xB, z: WORK.z, ry: faceY(-1, 0), ph: 0, amp: 0, lean: 0.55 * bump(0.82, 0.97, tau), arm: lerp(carry, -0.7, smooth((tau - 0.82) / 0.15)) };
-  if (tau < 1.09) return { x: WORK.xB, z: WORK.z, ry: turn(faceY(-1, 0), faceY(-1, 0) + Math.PI, (tau - 0.97) / 0.12), ph: 0, amp: 0, lean: 0, arm: lerp(-0.7, -0.1, smooth((tau - 0.97) / 0.12)) };
-  if (tau < 1.54) {
-    const u = (tau - 1.09) / 0.45;
-    return { x: lerp(WORK.xB, WORK.xA, smooth(u)), z: WORK.z, ry: faceY(1, 0), ph: smooth(u) * 6.3, amp: bump(0, 1, u), lean: 0, arm: -0.1 };
+  const end = PUSH0 + PUSH_GAP * SEGS;
+  if (tau < end) {
+    const j = Math.floor((tau - PUSH0) / PUSH_GAP), s = PUSH0 + PUSH_GAP * j;
+    const f = feed(k, t);
+    return { x: WORK.xB, z: WORK.zB + f, ry: YAW_Z, ph: f * 18, amp: 0.4 * bump(s, s + PUSH_LEN, tau), lean: 0.35 * bump(s - 0.05, s + PUSH_LEN + 0.05, tau), arm: push + 0.3 * (1 - bump(s, s + PUSH_LEN, tau)) };
   }
-  return atA;
+  const u = (tau - end) / (PC - end);
+  return { ...walk(WORK.xB, WORK.zB + 1, WORK.xA, WORK.zA, lerp(YAW_Z, YAW_X, smooth(u * 2)), u), arm: -0.1 };
 }
 worker.add(0.45, workerPose);
 worker.finalize();
@@ -442,7 +417,7 @@ const handPos = (w) => ({ x: w.x + Math.sin(w.ry) * 0.42, y: 1.0 - 0.35 * w.lean
   b.add(mesh(RB(0.36, 0.02, 0.36, 0.01), C.wood, 0, 0.455, 0));
   b.add(mesh(RB(0.04, 0.6, 0.04, 0.015), C.woodDark, 0.05, 0.72, 0, 0, 0, -0.35));
   b.add(mesh(RB(0.2, 0.1, 0.03, 0.012), C.steel, -0.05, 0.47, 0, 0, 0, -0.35));
-  addGroup(b, 0.3, 3.4, 0, 0.2);
+  addGroup(b, 0.3, 3.5, 0, 2.6);
   const can = new THREE.Group();
   can.add(mesh(RB(0.34, 0.45, 0.17, 0.05), C.mfRed, 0, 0.225, 0));
   can.add(mesh(RB(0.2, 0.05, 0.05, 0.02), C.mfRed, 0, 0.48, 0));
@@ -450,7 +425,7 @@ const handPos = (w) => ({ x: w.x + Math.sin(w.ry) * 0.42, y: 1.0 - 0.35 * w.lean
 }
 const slot = (k) => {
   const row = 4 - Math.floor(k / 6), col = k % 6;
-  return { x: 2.02 + col * 0.17 + (row % 2) * 0.085, y: 0.16 + row * 0.148, z: TROUGH.z, row };
+  return { x: 2.02 + col * 0.17 + (row % 2) * 0.085, y: 0.16 + row * 0.148, z: WORK.zA, row };
 };
 const logSegs = new Kind([
   { geo: RB(1 / 3 - 0.004, LOG_D, LOG_D, 0.075), color: C.birch, local: new THREE.Matrix4() },
@@ -462,77 +437,69 @@ const logSegs = new Kind([
 for (let k = 0; k < NLOG; k++) {
   const sl = slot(k), roll = rr(0, TAU);
   for (let j = 0; j < SEGS; j++) {
-    const off = -(j - 1) / 3;   // world z offset along the log (segment 0 = front, nearest the saw)
-    logSegs.add(0.3 + (4 - sl.row) * 0.0 + sl.row * 0.04 + rr(0, 0.03), (t) => {
+    const off = -(j - 1) / 3;   // world z offset along the log (segment 0 = front, nearest the blade)
+    logSegs.add(0.3 + sl.row * 0.04 + rr(0, 0.03), (t) => {
       const base = { ry: Math.PI / 2, rx: roll };
       if (t < pickT(k)) return { ...base, x: sl.x, y: sl.y, z: sl.z + off };
       if (t < placeT(k)) {
         const w = workerPose(t), h = handPos(w), tau = t - pickT(k);
         let x = h.x, y = h.y, z = h.z;
-        if (tau < 0.25) { const u = smooth(tau / 0.25); x = lerp(sl.x, h.x, u); y = lerp(sl.y, h.y, u) + 0.15 * bump(0, 1, u); z = lerp(sl.z, h.z, u); }
-        else if (tau > 0.82) { const u = smooth((tau - 0.82) / 0.15); x = lerp(h.x, MACH_X, u); y = lerp(h.y, TROUGH.y, u); z = lerp(h.z, TROUGH.z, u); }
+        if (tau < 0.2) { const u = smooth(tau / 0.2); x = lerp(sl.x, h.x, u); y = lerp(sl.y, h.y, u) + 0.15 * bump(0, 1, u); z = lerp(sl.z, h.z, u); }
+        else if (tau > 0.6) { const u = smooth((tau - 0.6) / 0.12); x = lerp(h.x, MACH_X, u); y = lerp(h.y, TROUGH.y, u); z = lerp(h.z, TROUGH.z, u); }
         return { ...base, x, y, z: z + off };
       }
-      const c = cutT(k, j);
-      if (t < c) return { ...base, x: MACH_X, y: TROUGH.y, z: TROUGH.z + off + feed(t - placeT(k)) };
-      const zc = SAW_Z + 1 / 6, sp = splitT(k, j);
-      if (t < sp) return { ...base, x: MACH_X, y: TROUGH.y - 0.25 * smoothstep(c + 0.03, c + 0.18, t), z: zc };
-      if (t < sp + 0.15) return { ...base, x: MACH_X, y: TROUGH.y - 0.25, z: zc + 0.55 * smooth((t - sp) / 0.15) };
+      if (t < chopT(k, j)) return { ...base, x: MACH_X, y: TROUGH.y, z: TROUGH.z + off + feed(k, t) };
       return { x: 0, z: 0, s: 0 };
     });
   }
 }
 logSegs.finalize();
 
-// ---------------------------------------------------------------- split pieces → conveyor → pile
+// ---------------------------------------------------------------- each chop throws two halves sideways onto the pile
 // Rest spots: piece n lies on the surface of a cone scaled by (n/N)^(1/3), so the pile grows self-similarly.
 const spots = [];
 for (let n = 0; n < NPIECE; n++) {
   const s = Math.cbrt((n + 1) / NPIECE), a = rr(0, TAU), rho = Math.sqrt(rr(0.02, 1));
-  const r = PILE.R * s * rho, y = PILE.H * s * (1 - rho) + 0.035;
-  spots.push({ x: PILE.x + r * Math.cos(a), y, z: PILE.z + r * Math.sin(a), ry: rr(0, TAU), rx: rr(-0.4, 0.4), rz: (1 - rho) * 0.5 * Math.sign(Math.cos(a)) + rr(-0.3, 0.3) });
+  const r = PILE.R * s * rho, y = PILE.H * s * (1 - rho) + 0.04;
+  spots.push({ x: PILE.x + r * Math.cos(a), y, z: PILE.z + r * Math.sin(a), ry: rr(0, TAU), rx: rr(-0.4, 0.4), rz: rr(-0.4, 0.4) });
 }
 const pieces = new Kind([
-  { geo: RB(0.32, 0.075, 0.075, 0.02), color: 'inst', slot: 'w', local: new THREE.Matrix4() },
-  { geo: RB(0.3, 0.02, 0.06, 0.008), color: C.birch, local: TRS(0, 0.036, 0) },
+  { geo: RB(0.32, 0.075, 0.15, 0.025), color: 'inst', slot: 'w', local: new THREE.Matrix4() },
+  { geo: RB(0.3, 0.02, 0.13, 0.008), color: C.birch, local: TRS(0, 0.036, 0) },
 ], NPIECE);
-for (let k = 0; k < NLOG; k++) for (let j = 0; j < SEGS; j++) for (let q = 0; q < QUARTERS; q++) {
-  const n = k * 12 + j * 4 + q, sp = spots[n], b = bornT(k, j), te = tipT(k, j, q), lx = (q % 2 ? 0.07 : -0.07), spin = rr(1, 3) * (q % 2 ? 1 : -1);
+const landT = [];
+for (let k = 0; k < NLOG; k++) for (let j = 0; j < SEGS; j++) for (let h = 0; h < HALVES; h++) {
+  const n = (k * SEGS + j) * HALVES + h, sp = spots[n], c = chopT(k, j), spin = rr(2, 4) * (h ? 1 : -1);
+  const x0 = MACH_X + (h ? 0.04 : -0.04), z0 = SAW_Z + 1 / 6, rz0 = h ? Math.PI / 2 : -Math.PI / 2;
+  landT.push(c + FLY);
   pieces.add(0.4 + rr(0, 0.25), (t) => {
-    if (t < b + CONV_T * q * 0.09) return { x: 0, z: 0, s: 0 };
-    if (t < te) {
-      const u = (t - b) / CONV_T - q * 0.09;
-      return { x: MACH_X + lx, y: lerp(CONV_S.y, CONV_E.y, u) + 0.08, z: lerp(CONV_S.z, CONV_E.z, u), rx: -CONV_A, s: smoothstep(0, 0.06, u) };
-    }
-    if (t < te + FLY) {
-      const u = (t - te) / FLY;
+    if (t < c) return { x: 0, z: 0, s: 0 };
+    if (t < c + FLY) {
+      const u = (t - c) / FLY;
       return {
-        x: lerp(MACH_X + lx, sp.x, u), y: lerp(CONV_E.y + 0.08, sp.y, u) + 0.35 * Math.sin(Math.PI * u) * (1 - u * 0.5), z: lerp(CONV_E.z + 0.1, sp.z, u),
-        ry: lerp(0, sp.ry, u), rx: lerp(-CONV_A, sp.rx, u) + spin * Math.sin(Math.PI * u), rz: lerp(0, sp.rz, u),
+        x: lerp(x0, sp.x, u), y: lerp(TROUGH.y, sp.y, u) + 0.45 * Math.sin(Math.PI * u), z: lerp(z0, sp.z, u),
+        ry: lerp(Math.PI / 2, sp.ry, u), rx: lerp(0, sp.rx, u) + spin * Math.sin(Math.PI * u), rz: lerp(rz0, sp.rz, u),
       };
     }
     return sp;
   }, { w: [C.wood, 0xe9cf9e, 0xdcb97f, 0xeed8ad][n % 4] });
 }
 pieces.finalize();
+const LANDS = landT.slice().sort((a, b) => a - b);
 // pile core so the inside of the heap reads solid as it grows
-const landedCont = (t) => {
-  let n = 0;
-  for (let k = 0; k < NLOG; k++) for (let j = 0; j < SEGS; j++) for (let q = 0; q < QUARTERS; q++) n += clamp01((t - tipT(k, j, q)) / FLY);
-  return n;
-};
+const landedCont = (t) => { let n = 0; for (const x of landT) n += clamp01((t - (x - FLY)) / FLY); return n; };
 const coreGeo = new THREE.ConeGeometry(1, 1, 28, 1).translate(0, 0.5, 0);
 const core = new THREE.Mesh(coreGeo, MAT(C.woodDark, { roughness: 0.9 }));
 core.receiveShadow = true; core.castShadow = true;
 scene.add(core);
-// sawdust spray at each cut
+// wood chips spray at each chop
 const dust = new Kind([{ geo: RB(0.05, 0.05, 0.05, 0.02), color: C.wood, local: new THREE.Matrix4(), shadow: false }], 24);
 for (let i = 0; i < 18; i++) {
   const vx = rr(0.4, 1.4), vy = rr(0.4, 1.4), vz = rr(-0.4, 0.4);
   dust.add(0.5, (t) => {
-    const a = t - lastBefore(CUTS, t) - i * 0.012;
+    const a = t - lastBefore(CHOPS, t) - i * 0.012;
     if (a < 0 || a > 0.6) return { x: 0, z: 0, s: 0 };
-    return { x: MACH_X + 0.3 + vx * a, y: 0.95 + vy * a - 4.9 * a * a, z: SAW_Z + vz * a, s: 1 - a / 0.6, ry: i };
+    return { x: MACH_X + 0.1 + vx * a, y: TROUGH.y + 0.1 + vy * a - 4.9 * a * a, z: SAW_Z + vz * a, s: 1 - a / 0.6, ry: i };
   });
 }
 dust.finalize();
@@ -550,7 +517,7 @@ const spruce = new Kind([
   { geo: RB(0.16, 0.6, 0.16, 0.05), color: C.woodDark, local: TRS(0, 0.3, 0) },
   ...[0, 1, 2, 3].map((i) => ({ geo: RB(1.2 - i * 0.26, 0.42, 1.2 - i * 0.26, 0.12), color: i % 2 ? C.tealDeep : C.greenDeep, local: TRS(0, 0.65 + i * 0.42, 0, 0, i * 0.4, 0) })),
 ], 12);
-[[-5.0, -3.2, 0], [-3.4, -3.4, 1], [-5.1, 1.6, 1], [-5.0, 3.6, 0], [-4.8, 6.1, 1], [-5.0, -0.8, 0], [4.4, -3.3, 0], [1.0, -3.4, 1], [-1.6, -3.5, 0], [2.8, -3.5, 1], [-2.0, -2.6, 1]]
+[[-4.4, -4.2, 0], [-3.0, -4.3, 1], [-4.4, 1.6, 1], [-4.3, 3.4, 0], [-4.4, -0.8, 0], [3.6, -4.2, 0], [1.0, -4.3, 1], [-1.6, -4.4, 0], [2.6, -4.3, 1], [-2.2, -3.4, 1]]
   .forEach(([x, z, type], i) => {
     const s = rr(0.8, 1.15), ph = rr(0, TAU), ry = rr(0, TAU);
     (type ? spruce : birch).add(0.25 + 0.03 * i, (t) => ({ x, y: 0, z, ry, s, rx: 0.025 * Math.sin(TAU * t / swayP + ph), rz: 0.025 * Math.cos(TAU * t / swayP + ph) }));
@@ -561,7 +528,7 @@ const grass = new Kind([
   { geo: RB(0.05, 0.18, 0.05, 0.02), color: C.greenDeep, local: TRS(0.05, 0.08, 0.03, 0, 0, -0.3) },
   { geo: RB(0.05, 0.2, 0.05, 0.02), color: C.green, local: TRS(-0.03, 0.09, -0.04, 0.3, 0, 0) },
 ], 70);
-const keepOut = [[-4.0, 1.0, -1.6, 0.6], [-0.2, 1.3, -2.4, 3.3], [1.3, 3.4, -2.4, -0.9], [-0.9, 1.9, 2.6, 5.4], [3.1, 3.7, -0.1, 0.5], [-0.8, -0.2, 0.7, 1.3]];
+const keepOut = [[-4.5, 0.8, -1.6, 0.6], [-0.2, 1.4, -2.4, 0.0], [1.3, 3.4, -2.4, -0.9], [0.6, 3.3, -0.5, 2.2], [3.2, 3.8, 2.3, 2.9], [-0.8, -0.2, 0.7, 1.3]];
 const free = (x, z) => !keepOut.some(([x0, x1, z0, z1]) => x > x0 && x < x1 && z > z0 && z < z1);
 for (let n = 0, tries = 0; n < 60 && tries < 2000; tries++) {
   const x = SCX + rr(-HALF + 0.3, HALF - 0.3), z = SCZ + rr(-HALF + 0.3, HALF - 0.3);
@@ -654,18 +621,14 @@ small.width = Math.ceil(CARD.w / 8); small.height = Math.ceil(CARD.h / 8);
 const sctx = small.getContext('2d');
 const FONT = 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
 const countIf = (arr, t) => { let n = 0; for (const x of arr) if (x <= t) n++; return n; };
-const SPLIT_DONE = SPLITS.map((x) => x + 0.15);
-const LOG_DONE = Array.from({ length: NLOG }, (_, k) => splitT(k, SEGS - 1) + 0.15);
+const LOG_DONE = Array.from({ length: NLOG }, (_, k) => chopT(k, SEGS - 1));
 const PICKS = Array.from({ length: NLOG }, (_, k) => pickT(k) + 0.1);
-const LANDS = [];
-for (let k = 0; k < NLOG; k++) for (let j = 0; j < SEGS; j++) for (let q = 0; q < QUARTERS; q++) LANDS.push(landT(k, j, q));
-LANDS.sort((a, b) => a - b);
 function stats(t) {
   const down = t > LIVE_END ? 1 - smooth(t - LIVE_END) : 1;     // count back down while dismantling
   const up = smooth(t / BUILD_END);
   return {
     logs: Math.round(countIf(LOG_DONE, t) * down),
-    splits: Math.round(countIf(SPLIT_DONE, t) * down),
+    chops: Math.round(countIf(CHOPS, t) * down),
     pieces: Math.round(countIf(LANDS, t) * down),
     stacked: (NLOG - countIf(PICKS, t)) / NLOG * STACKED_M3 * up * down,
     loose: landedCont(t) / NPIECE * LOOSE_M3 * down,
@@ -706,7 +669,7 @@ function drawCard(t, src) {
   ctx.fillStyle = '#1c2541'; ctx.textBaseline = 'middle';
   ctx.font = `700 15px ${FONT}`;
   ctx.fillText('Pilkekone · Firewood Count', x + 32, y + 25);
-  [[`${s.logs}/${NLOG}`, 'Logs split', 16], [String(s.splits), 'Splits', 102], [String(s.pieces), 'Pieces', 166]].forEach(([v, label, ox]) => {
+  [[`${s.logs}/${NLOG}`, 'Logs split', 16], [String(s.chops), 'Chops', 102], [String(s.pieces), 'Pieces', 166]].forEach(([v, label, ox]) => {
     ctx.fillStyle = '#1c2541'; ctx.font = `700 19px ${FONT}`;
     ctx.fillText(v, x + ox, y + 60);
     ctx.fillStyle = 'rgba(28,37,65,0.62)'; ctx.font = `500 11px ${FONT}`;
